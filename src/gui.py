@@ -1,17 +1,23 @@
 import tkinter as tk
 from tkinter import ttk
+from tkcalendar import DateEntry
 import datetime
-import pickle
-from person import Person
-from project import Project
+import sqlite3
+import openpyxl
+import os
 
-class TimeTrackingApp:
+class TimeTrackingAppGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Time Tracking App")
 
-        # Create a new person or load existing data
-        self.person = self.load_data()
+        # Set the initial size of the root window
+        self.root.geometry("400x300")
+
+        self.notebook = ttk.Notebook(root)
+        self.notebook.pack(fill="both", expand=True)
+
+        self.logic = TimeTrackingAppLogic(self)
 
         # Project tab
         self.create_project_tab()
@@ -19,90 +25,160 @@ class TimeTrackingApp:
         # Log hours tab
         self.create_log_hours_tab()
 
-    def load_data(self):
-        try:
-            with open('project_data.pkl', 'rb') as file:
-                return pickle.load(file)
-        except FileNotFoundError:
-            return Person("Your Name")
-
-    def save_data(self):
-        with open('project_data.pkl', 'wb') as file:
-            pickle.dump(self.person, file)
+        # Overview tab
+        self.create_overview_tab()
 
     def create_project_tab(self):
-        project_tab = ttk.Frame(self.root)
-        project_tab.grid(row=0, column=0, padx=10, pady=10)
+        project_tab = ttk.Frame(self.notebook)
+        self.notebook.add(project_tab, text="Projects")
 
         # Project creation form
         project_label = ttk.Label(project_tab, text="New Project:")
-        project_label.grid(row=0, column=0, pady=5, sticky=tk.W)
+        project_label.pack(pady=5, anchor=tk.W)
 
-        self.project_number_entry = ttk.Entry(project_tab, width=10)
+        ttk.Label(project_tab, text="Project Name:").pack(pady=5, anchor=tk.W)
         self.project_name_entry = ttk.Entry(project_tab, width=20)
-        self.project_planned_hours_entry = ttk.Entry(project_tab, width=10)
+        self.project_name_entry.pack(pady=5, anchor=tk.W)
 
-        ttk.Label(project_tab, text="Project Number:").grid(row=1, column=0, pady=5, sticky=tk.W)
-        self.project_number_entry.grid(row=1, column=1, pady=5, sticky=tk.W)
-        ttk.Label(project_tab, text="Project Name:").grid(row=2, column=0, pady=5, sticky=tk.W)
-        self.project_name_entry.grid(row=2, column=1, pady=5, sticky=tk.W)
-        ttk.Label(project_tab, text="Planned Hours:").grid(row=3, column=0, pady=5, sticky=tk.W)
-        self.project_planned_hours_entry.grid(row=3, column=1, pady=5, sticky=tk.W)
-
-        add_project_button = ttk.Button(project_tab, text="Add Project", command=self.add_project)
-        add_project_button.grid(row=4, column=0, columnspan=2, pady=10)
+        add_project_button = ttk.Button(project_tab, text="Add Project", command=self.logic.add_project)
+        add_project_button.pack(pady=10)
 
     def create_log_hours_tab(self):
-        log_hours_tab = ttk.Frame(self.root)
-        log_hours_tab.grid(row=0, column=1, padx=10, pady=10)
+        log_hours_tab = ttk.Frame(self.notebook)
+        self.notebook.add(log_hours_tab, text="Log Hours")
 
         # Log hours form
         log_hours_label = ttk.Label(log_hours_tab, text="Log Hours:")
-        log_hours_label.grid(row=0, column=0, pady=5, sticky=tk.W)
+        log_hours_label.pack(pady=5, anchor=tk.W)
 
-        self.project_select = ttk.Combobox(log_hours_tab, values=list(self.person.projects.keys()))
+        ttk.Label(log_hours_tab, text="Project Name:").pack(pady=5, anchor=tk.W)
+        self.project_select = ttk.Combobox(log_hours_tab, values=self.logic.get_project_names())
+        self.project_select.pack(pady=5, anchor=tk.W)
+
+        ttk.Label(log_hours_tab, text="Date:").pack(pady=5, anchor=tk.W)
+        self.date_entry = DateEntry(log_hours_tab, width=12, date_pattern="dd/mm/yyyy")
+        self.date_entry.pack(pady=5, anchor=tk.W)
+
+        ttk.Label(log_hours_tab, text="Hours:").pack(pady=5, anchor=tk.W)
         self.hours_entry = ttk.Entry(log_hours_tab, width=10)
+        self.hours_entry.pack(pady=5, anchor=tk.W)
 
-        ttk.Label(log_hours_tab, text="Project Number:").grid(row=1, column=0, pady=5, sticky=tk.W)
-        self.project_select.grid(row=1, column=1, pady=5, sticky=tk.W)
-        ttk.Label(log_hours_tab, text="Date:").grid(row=2, column=0, pady=5, sticky=tk.W)
-        ttk.Entry(log_hours_tab, state="readonly").grid(row=2, column=1, pady=5, sticky=tk.W)  # Placeholder for date
-        ttk.Label(log_hours_tab, text="Hours:").grid(row=3, column=0, pady=5, sticky=tk.W)
-        self.hours_entry.grid(row=3, column=1, pady=5, sticky=tk.W)
+        log_hours_button = ttk.Button(log_hours_tab, text="Log Hours", command=self.logic.log_hours)
+        log_hours_button.pack(pady=10)
 
-        log_hours_button = ttk.Button(log_hours_tab, text="Log Hours", command=self.log_hours)
-        log_hours_button.grid(row=4, column=0, columnspan=2, pady=10)
+    def create_overview_tab(self):
+        overview_tab = ttk.Frame(self.notebook)
+        self.notebook.add(overview_tab, text="Overview")
+
+        # Overview form
+        overview_label = ttk.Label(overview_tab, text="Weekly Overview:")
+        overview_label.pack(pady=5, anchor=tk.W)
+
+        self.week_select = ttk.Combobox(overview_tab, values=self.logic.get_weeks())
+        self.week_select.pack(pady=5, anchor=tk.W)
+
+        # Set the current week as the default selection
+        current_week = datetime.date.today().isocalendar()[1]
+        for index, week in enumerate(self.logic.get_weeks()):
+            if str(current_week) in week.split(" ")[1]:
+                self.week_select.current(index)
+                break
+
+        overview_button = ttk.Button(overview_tab, text="Get Overview", command=self.logic.get_weekly_overview)
+        overview_button.pack(pady=10)
+
+class TimeTrackingAppLogic:
+    def __init__(self, gui):
+        self.gui = gui
+        self.conn = sqlite3.connect('data/time_tracking.db')
+        self.cursor = self.conn.cursor()
+        self.cursor.execute('''CREATE TABLE IF NOT EXISTS projects (id INTEGER PRIMARY KEY, name TEXT)''')
+        self.cursor.execute('''CREATE TABLE IF NOT EXISTS hours (project_id INTEGER, date TEXT, hours INTEGER)''')
+        self.conn.commit()
 
     def add_project(self):
-        project_number = int(self.project_number_entry.get())
-        project_name = self.project_name_entry.get()
-        planned_hours = int(self.project_planned_hours_entry.get())
+        project_name = self.gui.project_name_entry.get()
 
-        new_project = Project(project_number, project_name, planned_hours)
-        self.person.add_project(new_project)
-        self.save_data()
+        if project_name:
+            self.cursor.execute("INSERT INTO projects (name) VALUES (?)", (project_name,))
+            self.conn.commit()
 
-        # Update project dropdown in log hours tab
-        self.project_select["values"] = list(self.person.projects.keys())
+            # Clear project creation form
+            self.gui.project_name_entry.delete(0, tk.END)
 
-        # Clear project creation form
-        self.project_number_entry.delete(0, tk.END)
-        self.project_name_entry.delete(0, tk.END)
-        self.project_planned_hours_entry.delete(0, tk.END)
+            # Update project selection dropdown
+            self.gui.project_select['values'] = self.get_project_names()
 
     def log_hours(self):
-        project_number = int(self.project_select.get())
-        hours = int(self.hours_entry.get())
-        current_date = datetime.date.today()
+        project_name = self.gui.project_select.get()
+        hours = int(self.gui.hours_entry.get())
+        current_date = self.gui.date_entry.get()
 
-        self.person.log_hours(project_number, current_date, hours)
-        self.save_data()
+        if project_name and hours and current_date:
+            project_id = self.get_project_id(project_name)
+            self.cursor.execute("INSERT INTO hours (project_id, date, hours) VALUES (?, ?, ?)", (project_id, current_date, hours))
+            self.conn.commit()
 
-        # Clear log hours form
-        self.project_select.set("")  # Reset the combobox selection
-        self.hours_entry.delete(0, tk.END)
+            # Clear log hours form
+            self.gui.project_select.set("")  # Reset the combobox selection
+            self.gui.hours_entry.delete(0, tk.END)
 
-if __name__ == "__main__":
-    root = tk.Tk()
-    app = TimeTrackingApp(root)
-    root.mainloop()
+    def get_project_names(self):
+        self.cursor.execute("SELECT name FROM projects")
+        return [row[0] for row in self.cursor.fetchall()]
+
+    def get_project_id(self, project_name):
+        self.cursor.execute("SELECT id FROM projects WHERE name = ?", (project_name,))
+        return self.cursor.fetchone()[0]
+
+    def get_weeks(self):
+        weeks = []
+        today = datetime.date.today()
+        current_year = today.year
+
+        for week in range(1, 54):
+            start_date = datetime.datetime.strptime(f"{current_year}-W{week}-1", "%Y-W%W-%w").date()
+            end_date = start_date + datetime.timedelta(days=4)
+            week_str = f"Week {week}, {start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')}"
+            weeks.append(week_str)
+
+        return weeks
+
+    def get_weekly_overview(self):
+        selected_week = self.gui.week_select.get()
+
+        start_date_str = selected_week.split(" - ")[0].strip()
+        start_date = datetime.datetime.strptime(start_date_str, "%d/%m/%Y").date()
+
+        # Create a new workbook and add a worksheet
+        workbook = openpyxl.Workbook()
+        sheet = workbook.active
+
+        # Write headers to the sheet
+        sheet.append(["Project Number", "Project Name", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"])
+
+        for project_name in self.get_project_names():
+            project_id = self.get_project_id(project_name)
+            project_data = [project_id, project_name]
+
+            # Iterate through each day of the week
+            date = start_date
+            for _ in range(5):
+                # Query hours for the specific project and date
+                self.cursor.execute("SELECT COALESCE(SUM(hours), 0) FROM hours WHERE project_id = ? AND date = ?", (project_id, date.strftime("%d/%m/%Y")))
+                hours = self.cursor.fetchone()[0]
+                project_data.append(hours)
+
+                # Move to the next day
+                date += datetime.timedelta(days=1)
+
+            # Add project data to the sheet
+            sheet.append(project_data)
+
+        # Save to Excel file
+        file_path = "WeeklyOverview.xlsx"
+        workbook.save(file_path)
+
+        # Open the saved Excel file
+        os.system(f"start excel.exe {file_path}")
+

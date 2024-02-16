@@ -1,8 +1,8 @@
-# main.py
 import tkinter as tk
-from gui import TimeTrackingApp
+from tkinter import ttk
+from gui import TimeTrackingAppGUI
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = TimeTrackingApp(root)
+    app = TimeTrackingAppGUI(root)
     root.mainloop()
