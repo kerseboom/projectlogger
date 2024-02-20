@@ -34,14 +34,14 @@ class TimeTrackingAppGUI:
 
         # Project creation form
         project_label = ttk.Label(project_tab, text="New Project:")
-        project_label.pack(pady=5, anchor=tk.W)
+        project_label.pack(side="top", pady=5, anchor=tk.W)
 
-        ttk.Label(project_tab, text="Project Name:").pack(pady=5, anchor=tk.W)
+        ttk.Label(project_tab, text="Project Name:").pack(side="top", pady=5, anchor=tk.W)
         self.project_name_entry = ttk.Entry(project_tab, width=20)
-        self.project_name_entry.pack(pady=5, anchor=tk.W)
+        self.project_name_entry.pack(side="top", pady=5, anchor=tk.W)
 
         add_project_button = ttk.Button(project_tab, text="Add Project", command=self.logic.add_project)
-        add_project_button.pack(pady=10)
+        add_project_button.pack(side="top", pady=10)
 
     def create_log_hours_tab(self):
         log_hours_tab = ttk.Frame(self.notebook)
@@ -49,22 +49,22 @@ class TimeTrackingAppGUI:
 
         # Log hours form
         log_hours_label = ttk.Label(log_hours_tab, text="Log Hours:")
-        log_hours_label.pack(pady=5, anchor=tk.W)
+        log_hours_label.pack(side="top", pady=5, anchor=tk.W)
 
-        ttk.Label(log_hours_tab, text="Project Name:").pack(pady=5, anchor=tk.W)
+        ttk.Label(log_hours_tab, text="Project Name:").pack(side="top", pady=5, anchor=tk.W)
         self.project_select = ttk.Combobox(log_hours_tab, values=self.logic.get_project_names())
-        self.project_select.pack(pady=5, anchor=tk.W)
+        self.project_select.pack(side="top", pady=5, anchor=tk.W)
 
-        ttk.Label(log_hours_tab, text="Date:").pack(pady=5, anchor=tk.W)
+        ttk.Label(log_hours_tab, text="Date:").pack(side="top", pady=5, anchor=tk.W)
         self.date_entry = DateEntry(log_hours_tab, width=12, date_pattern="dd/mm/yyyy")
-        self.date_entry.pack(pady=5, anchor=tk.W)
+        self.date_entry.pack(side="top", pady=5, anchor=tk.W)
 
-        ttk.Label(log_hours_tab, text="Hours:").pack(pady=5, anchor=tk.W)
+        ttk.Label(log_hours_tab, text="Hours:").pack(side="top", pady=5, anchor=tk.W)
         self.hours_entry = ttk.Entry(log_hours_tab, width=10)
-        self.hours_entry.pack(pady=5, anchor=tk.W)
+        self.hours_entry.pack(side="top", pady=5, anchor=tk.W)
 
         log_hours_button = ttk.Button(log_hours_tab, text="Log Hours", command=self.logic.log_hours)
-        log_hours_button.pack(pady=10)
+        log_hours_button.pack(side="top", pady=10)
 
     def create_overview_tab(self):
         overview_tab = ttk.Frame(self.notebook)
@@ -72,10 +72,10 @@ class TimeTrackingAppGUI:
 
         # Overview form
         overview_label = ttk.Label(overview_tab, text="Weekly Overview:")
-        overview_label.pack(pady=5, anchor=tk.W)
+        overview_label.pack(side="top", pady=5, anchor=tk.W)
 
         self.week_select = ttk.Combobox(overview_tab, values=self.logic.get_weeks())
-        self.week_select.pack(pady=5, anchor=tk.W)
+        self.week_select.pack(side="top", pady=5, anchor=tk.W)
 
         # Set the current week as the default selection
         current_week = datetime.date.today().isocalendar()[1]
@@ -85,7 +85,7 @@ class TimeTrackingAppGUI:
                 break
 
         overview_button = ttk.Button(overview_tab, text="Get Overview", command=self.logic.get_weekly_overview)
-        overview_button.pack(pady=10)
+        overview_button.pack(side="top", pady=10)
 
 class TimeTrackingAppLogic:
     def __init__(self, gui):
@@ -134,13 +134,16 @@ class TimeTrackingAppLogic:
     def get_weeks(self):
         weeks = []
         today = datetime.date.today()
+        current_week = today.isocalendar()[1]
         current_year = today.year
 
-        for week in range(1, 54):
+        for week in range(1, current_week + 1):
             start_date = datetime.datetime.strptime(f"{current_year}-W{week}-1", "%Y-W%W-%w").date()
             end_date = start_date + datetime.timedelta(days=4)
-            week_str = f"Week {week}, {start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')}"
+            week_str = f"{start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')}"
             weeks.append(week_str)
+
+        weeks.reverse()
 
         return weeks
 
@@ -149,6 +152,9 @@ class TimeTrackingAppLogic:
 
         start_date_str = selected_week.split(" - ")[0].strip()
         start_date = datetime.datetime.strptime(start_date_str, "%d/%m/%Y").date()
+
+        end_date_str = selected_week.split(" - ")[1].strip()
+        end_date = datetime.datetime.strptime(end_date_str, "%d/%m/%Y").date()
 
         # Create a new workbook and add a worksheet
         workbook = openpyxl.Workbook()
@@ -165,7 +171,10 @@ class TimeTrackingAppLogic:
             date = start_date
             for _ in range(5):
                 # Query hours for the specific project and date
-                self.cursor.execute("SELECT COALESCE(SUM(hours), 0) FROM hours WHERE project_id = ? AND date = ?", (project_id, date.strftime("%d/%m/%Y")))
+                self.cursor.execute(
+                    "SELECT COALESCE(SUM(hours), 0) FROM hours WHERE project_id = ? AND date = ?",
+                    (project_id, date.strftime("%d/%m/%Y"))
+                )
                 hours = self.cursor.fetchone()[0]
                 project_data.append(hours)
 
@@ -176,9 +185,8 @@ class TimeTrackingAppLogic:
             sheet.append(project_data)
 
         # Save to Excel file
-        file_path = "WeeklyOverview.xlsx"
+        file_path = f"log_workinghours_{start_date.strftime('%Y%m%d')}_to_{end_date.strftime('%Y%m%d')}.xlsx"
         workbook.save(file_path)
 
         # Open the saved Excel file
         os.system(f"start excel.exe {file_path}")
-
