@@ -153,6 +153,9 @@ class TimeTrackingAppLogic:
 
             # Clear project creation form
             self.gui.project_name_entry.delete(0, tk.END)
+            self.gui.project_number_entry.delete(0, tk.END)
+            self.gui.planned_hours_entry.delete(0, tk.END)
+
 
             # Update project selection dropdown
             self.gui.project_select['values'] = self.get_project_names()
