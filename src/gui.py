@@ -36,12 +36,60 @@ class TimeTrackingAppGUI:
         project_label = ttk.Label(project_tab, text="New Project:")
         project_label.pack(side="top", pady=5, anchor=tk.W)
 
+        ttk.Label(project_tab, text="Project Number:").pack(side="top", pady=5, anchor=tk.W)
+        self.project_number_entry = ttk.Entry(project_tab, width=20)
+        self.project_number_entry.pack(side="top", pady=5, anchor=tk.W)
+
         ttk.Label(project_tab, text="Project Name:").pack(side="top", pady=5, anchor=tk.W)
         self.project_name_entry = ttk.Entry(project_tab, width=20)
         self.project_name_entry.pack(side="top", pady=5, anchor=tk.W)
 
+        ttk.Label(project_tab, text="Planned Hours:").pack(side="top", pady=5, anchor=tk.W)
+        self.planned_hours_entry = ttk.Entry(project_tab, width=10)
+        self.planned_hours_entry.pack(side="top", pady=5, anchor=tk.W)
+
         add_project_button = ttk.Button(project_tab, text="Add Project", command=self.logic.add_project)
         add_project_button.pack(side="top", pady=10)
+
+    def add_project(self):
+        project_number = self.gui.project_number_entry.get()
+        project_name = self.gui.project_name_entry.get()
+        planned_hours = int(self.gui.planned_hours_entry.get())
+
+        if project_number and project_name and planned_hours:
+            self.cursor.execute("INSERT INTO projects (number, name, planned_hours) VALUES (?, ?, ?)", (project_number, project_name, planned_hours))
+            self.conn.commit()
+
+            # Clear project creation form
+            self.gui.project_number_entry.delete(0, tk.END)
+            self.gui.project_name_entry.delete(0, tk.END)
+            self.gui.planned_hours_entry.delete(0, tk.END)
+
+            # Update project selection dropdown
+            self.gui.project_select['values'] = self.get_project_names()
+
+    def create_log_hours_tab(self):
+        log_hours_tab = ttk.Frame(self.notebook)
+        self.notebook.add(log_hours_tab, text="Log Hours")
+
+        # Log hours form
+        log_hours_label = ttk.Label(log_hours_tab, text="Log Hours:")
+        log_hours_label.pack(side="top", pady=5, anchor=tk.W)
+
+        ttk.Label(log_hours_tab, text="Project Number:").pack(side="top", pady=5, anchor=tk.W)
+        self.project_select = ttk.Combobox(log_hours_tab, values=self.logic.get_project_numbers())
+        self.project_select.pack(side="top", pady=5, anchor=tk.W)
+
+        ttk.Label(log_hours_tab, text="Date:").pack(side="top", pady=5, anchor=tk.W)
+        self.date_entry = DateEntry(log_hours_tab, width=12, date_pattern="dd/mm/yyyy")
+        self.date_entry.pack(side="top", pady=5, anchor=tk.W)
+
+        ttk.Label(log_hours_tab, text="Hours:").pack(side="top", pady=5, anchor=tk.W)
+        self.hours_entry = ttk.Entry(log_hours_tab, width=10)
+        self.hours_entry.pack(side="top", pady=5, anchor=tk.W)
+
+        log_hours_button = ttk.Button(log_hours_tab, text="Log Hours", command=self.logic.log_hours)
+        log_hours_button.pack(side="top", pady=10)
 
     def create_log_hours_tab(self):
         log_hours_tab = ttk.Frame(self.notebook)
@@ -92,7 +140,7 @@ class TimeTrackingAppLogic:
         self.gui = gui
         self.conn = sqlite3.connect('data/time_tracking.db')
         self.cursor = self.conn.cursor()
-        self.cursor.execute('''CREATE TABLE IF NOT EXISTS projects (id INTEGER PRIMARY KEY, name TEXT)''')
+        self.cursor.execute('''CREATE TABLE IF NOT EXISTS projects (id INTEGER PRIMARY KEY, number TEXT, name TEXT, planned_hours INTEGER)''')
         self.cursor.execute('''CREATE TABLE IF NOT EXISTS hours (project_id INTEGER, date TEXT, hours INTEGER)''')
         self.conn.commit()
 
